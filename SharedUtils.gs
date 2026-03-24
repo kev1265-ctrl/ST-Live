@@ -390,24 +390,24 @@ function computeSupertrend_(ohlcv, period, multiplier) {
   const atr = computeATR_(ohlcv, period);
   const out = Array.from({length: n}, () => ({ band: NaN, direction: '', signal: '' }));
   let prevUpper = NaN, prevLower = NaN, dir = 'SELL';
-
+ 
   for (let i = period - 1; i < n; i++) {
     const a = atr[i];
     if (isNaN(a)) continue;
     const hl2 = (ohlcv[i].high + ohlcv[i].low) / 2;
     const rawU = hl2 + multiplier * a;
     const rawL = hl2 - multiplier * a;
-    const prevClose = i > 0 ? ohlcv[i-1].close : ohlcv[i].close;
-
-    const upper = (!isNaN(prevUpper) && rawU > prevUpper && prevClose <= prevUpper)
-      ? prevUpper : rawU;
-    const lower = (!isNaN(prevLower) && rawL < prevLower && prevClose >= prevLower)
-      ? prevLower : rawL;
-
+ 
+    // FIXED: Proper band smoothing
+    // Upper band: keep previous if it's lower (bands should converge, not oscillate)
+    // Lower band: keep previous if it's higher
+    const upper = (!isNaN(prevUpper) && rawU > prevUpper) ? prevUpper : rawU;
+    const lower = (!isNaN(prevLower) && rawL < prevLower) ? prevLower : rawL;
+ 
     let newDir = dir;
     if (dir === 'SELL' && ohlcv[i].close > upper) newDir = 'BUY';
     if (dir === 'BUY'  && ohlcv[i].close < lower) newDir = 'SELL';
-
+ 
     out[i].band      = newDir === 'BUY' ? lower : upper;
     out[i].direction = newDir;
     out[i].signal    = newDir !== dir ? newDir : '';
@@ -417,6 +417,7 @@ function computeSupertrend_(ohlcv, period, multiplier) {
   }
   return out;
 }
+ 
 
 // Full analysis for one ticker. Returns snapshot object or null.
 function analyzeOHLCV_(ohlcv, cfg) {
